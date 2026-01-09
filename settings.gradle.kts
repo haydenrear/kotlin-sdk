@@ -26,3 +26,4 @@ include(":acp-ktor-test")
 
 // Include sample projects
 include(":samples:kotlin-acp-client-sample")
+include(":samples:kotlin-acp-openai-agent")
