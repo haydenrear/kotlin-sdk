@@ -11,7 +11,6 @@ import com.agentclientprotocol.model.ClientCapabilities
 import com.agentclientprotocol.model.ContentBlock
 import com.agentclientprotocol.model.EnvVariable
 import com.agentclientprotocol.model.FileSystemCapability
-import com.agentclientprotocol.model.HttpHeader
 import com.agentclientprotocol.model.McpServer
 import com.agentclientprotocol.model.SessionUpdate
 import com.agentclientprotocol.model.ToolCallContent
@@ -69,9 +68,9 @@ class OpenAiAcpAgentOperationsTest {
         agentProtocol.start()
 
         val openAiClient = OpenAiClient(
-            apiKey = "local",
-            baseUrl = "http://localhost:11434",
-            model = "qwen3-coder:30b",
+            apiKey = "44ea10722f534fb78e90e0302316bdca.cw729sMvXOG91O_07AwhxfmY",
+            baseUrl = "http://localhost:8088",
+            model = "devstral-2:123b-cloud",
             systemPrompt = """
                 You are a helpful ACP agent.
                 When asked to perform file or terminal operations, respond only with ACP directives in XML.
@@ -296,8 +295,10 @@ class OpenAiAcpAgentOperationsTest {
     }
 }
 
+data class TerminalProcess(val process: Process, val output: MutableList<String>)
+
 private class TestClientOperations(private val cwd: Path) : com.agentclientprotocol.common.ClientSessionOperations, FileSystemOperations, TerminalOperations {
-    private val activeTerminals = ConcurrentHashMap<String, Process>()
+    private val activeTerminals = ConcurrentHashMap<String, TerminalProcess>()
 
     override suspend fun requestPermissions(
         toolCall: SessionUpdate.ToolCallUpdate,
@@ -349,7 +350,7 @@ private class TestClientOperations(private val cwd: Path) : com.agentclientproto
 
         val process = processBuilder.start()
         val terminalId = UUID.randomUUID().toString()
-        activeTerminals[terminalId] = process
+        activeTerminals[terminalId] = TerminalProcess(process, mutableListOf())
         return com.agentclientprotocol.model.CreateTerminalResponse(terminalId)
     }
 
@@ -358,17 +359,18 @@ private class TestClientOperations(private val cwd: Path) : com.agentclientproto
         _meta: kotlinx.serialization.json.JsonElement?
     ): com.agentclientprotocol.model.TerminalOutputResponse {
         val process = activeTerminals[terminalId] ?: error("Terminal not found: $terminalId")
-        val stdout = process.inputStream.bufferedReader().readText()
-        val stderr = process.errorStream.bufferedReader().readText()
+        val stdout = process.process.inputStream.bufferedReader().readText()
+        val stderr = process.process.errorStream.bufferedReader().readText()
         val output = if (stderr.isNotEmpty()) "$stdout\nSTDERR:\n$stderr" else stdout
-        return com.agentclientprotocol.model.TerminalOutputResponse(output, truncated = false)
+        process.output.add(output)
+        val out = process.output.joinToString ("")
+        return com.agentclientprotocol.model.TerminalOutputResponse(out, truncated = false)
     }
 
     override suspend fun terminalRelease(
         terminalId: String,
         _meta: kotlinx.serialization.json.JsonElement?
     ): com.agentclientprotocol.model.ReleaseTerminalResponse {
-        activeTerminals.remove(terminalId)
         return com.agentclientprotocol.model.ReleaseTerminalResponse()
     }
 
@@ -376,8 +378,11 @@ private class TestClientOperations(private val cwd: Path) : com.agentclientproto
         terminalId: String,
         _meta: kotlinx.serialization.json.JsonElement?
     ): com.agentclientprotocol.model.WaitForTerminalExitResponse {
+        if (activeTerminals[terminalId] == null)
+            return com.agentclientprotocol.model.WaitForTerminalExitResponse(0.toUInt())
+
         val process = activeTerminals[terminalId] ?: error("Terminal not found: $terminalId")
-        val exitCode = process.waitFor()
+        val exitCode = process.process.waitFor()
         return com.agentclientprotocol.model.WaitForTerminalExitResponse(exitCode.toUInt())
     }
 
@@ -386,7 +391,8 @@ private class TestClientOperations(private val cwd: Path) : com.agentclientproto
         _meta: kotlinx.serialization.json.JsonElement?
     ): com.agentclientprotocol.model.KillTerminalCommandResponse {
         val process = activeTerminals[terminalId]
-        process?.destroy()
+        process?.process?.destroy()
+        activeTerminals.remove(terminalId)
         return com.agentclientprotocol.model.KillTerminalCommandResponse()
     }
 }

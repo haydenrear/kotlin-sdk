@@ -11,6 +11,7 @@ import com.agentclientprotocol.common.SessionCreationParameters
 import com.agentclientprotocol.model.AgentCapabilities
 import com.agentclientprotocol.model.ContentBlock
 import com.agentclientprotocol.model.FileSystemCapability
+import com.agentclientprotocol.model.HttpHeader
 import com.agentclientprotocol.model.LATEST_PROTOCOL_VERSION
 import com.agentclientprotocol.model.McpCapabilities
 import com.agentclientprotocol.model.McpServer
@@ -68,6 +69,9 @@ import org.springframework.ai.openai.api.OpenAiApi
 import org.springframework.ai.tool.ToolCallback
 import org.springframework.ai.tool.definition.DefaultToolDefinition
 import org.springframework.ai.tool.resolution.StaticToolCallbackResolver
+import org.springframework.http.HttpHeaders
+import org.springframework.util.CollectionUtils
+import org.springframework.util.MultiValueMap
 import java.nio.file.Files
 import java.nio.file.OpenOption
 import java.nio.file.StandardOpenOption
@@ -164,14 +168,14 @@ class OpenAiAgentSession(
 
         if (!greeted) {
             greeted = true
-            val greeting = buildGreeting(fileSystemCapabilities != null, terminalCapabilities)
-            if (greeting.isNotBlank()) {
-                emit(
-                    Event.SessionUpdateEvent(
-                        SessionUpdate.AgentMessageChunk(ContentBlock.Text(greeting))
-                    )
-                )
-            }
+//            val greeting = buildGreeting(fileSystemCapabilities != null, terminalCapabilities)
+//            if (greeting.isNotBlank()) {
+//                emit(
+//                    Event.SessionUpdateEvent(
+//                        SessionUpdate.AgentMessageChunk(ContentBlock.Text(greeting))
+//                    )
+//                )
+//            }
         }
 
         val userText = content.filterIsInstance<ContentBlock.Text>()
@@ -1205,9 +1209,12 @@ public class OpenAiClient(
     val systemPrompt: String,
     private val mockResponse: String?
 ) {
+    val h = CollectionUtils.toMultiValueMap(mutableMapOf(Pair("Authorization", mutableListOf("Bearer " + apiKey))))
+
     private val openAiApi = OpenAiApi.builder()
         .apiKey(apiKey)
         .baseUrl(baseUrl)
+        .headers(h)
         .build()
 
     private val chatModel = OpenAiChatModel.builder()
