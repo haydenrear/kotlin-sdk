@@ -23,8 +23,6 @@ class SimpleAgentSession(
         _meta: JsonElement?,
     ): Flow<Event> = flow {
 
-        logger.info { "Processing prompt for session $sessionId" }
-
         try {
             val clientCapabilities = currentCoroutineContext().clientInfo.capabilities
 
@@ -67,13 +65,13 @@ class SimpleAgentSession(
             emit(Event.PromptResponseEvent(PromptResponse(StopReason.END_TURN)))
 
         } catch (e: Exception) {
-            logger.error(e) { "Error processing prompt" }
-//            emit(Event.PromptResponseEvent(PromptResponse(StopReason.REFUSAL)))
+//            logger.error(e) { "Error processing prompt" }
+            emit(Event.PromptResponseEvent(PromptResponse(StopReason.REFUSAL)))
         }
     }
 
     override suspend fun cancel() {
-        logger.info { "Cancellation requested for session: $sessionId" }
+//        logger.info { "Cancellation requested for session: $sessionId" }
     }
 
     private suspend fun FlowCollector<Event>.sendPlan() {
@@ -206,8 +204,6 @@ class SimpleAgentSession(
  */
 class SimpleAgentSupport : AgentSupport {
     override suspend fun initialize(clientInfo: ClientInfo): AgentInfo {
-        logger.info { "Initializing agent with protocol version ${clientInfo.protocolVersion}" }
-
         return AgentInfo(
             protocolVersion = LATEST_PROTOCOL_VERSION,
             capabilities = AgentCapabilities(

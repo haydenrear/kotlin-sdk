@@ -1,34 +1,14 @@
 package com.agentclientprotocol.samples.openai
 
-import com.agentclientprotocol.agent.Agent
-import com.agentclientprotocol.agent.AgentInfo
-import com.agentclientprotocol.agent.AgentSession
-import com.agentclientprotocol.agent.AgentSupport
-import com.agentclientprotocol.agent.client
-import com.agentclientprotocol.agent.clientInfo
+import com.agentclientprotocol.agent.*
 import com.agentclientprotocol.common.Event
 import com.agentclientprotocol.common.SessionCreationParameters
-import com.agentclientprotocol.model.AgentCapabilities
-import com.agentclientprotocol.model.ContentBlock
-import com.agentclientprotocol.model.FileSystemCapability
-import com.agentclientprotocol.model.HttpHeader
-import com.agentclientprotocol.model.LATEST_PROTOCOL_VERSION
-import com.agentclientprotocol.model.McpCapabilities
-import com.agentclientprotocol.model.McpServer
-import com.agentclientprotocol.model.PromptCapabilities
-import com.agentclientprotocol.model.PromptResponse
-import com.agentclientprotocol.model.SessionId
-import com.agentclientprotocol.model.SessionUpdate
-import com.agentclientprotocol.model.StopReason
-import com.agentclientprotocol.model.ToolCallContent
-import com.agentclientprotocol.model.ToolCallId
-import com.agentclientprotocol.model.ToolCallLocation
-import com.agentclientprotocol.model.ToolCallStatus
-import com.agentclientprotocol.model.ToolKind
+import com.agentclientprotocol.model.*
 import com.agentclientprotocol.protocol.Protocol
 import com.agentclientprotocol.transport.StdioTransport
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.modelcontextprotocol.client.McpClient
 import io.modelcontextprotocol.client.McpSyncClient
 import io.modelcontextprotocol.client.transport.HttpClientStreamableHttpTransport
@@ -36,8 +16,6 @@ import io.modelcontextprotocol.client.transport.ServerParameters
 import io.modelcontextprotocol.client.transport.StdioClientTransport
 import io.modelcontextprotocol.json.jackson.JacksonMcpJsonMapper
 import io.modelcontextprotocol.spec.McpSchema
-import io.github.oshai.kotlinlogging.KotlinLogging
-import jdk.dynalink.StandardOperation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
@@ -49,13 +27,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.io.asSink
 import kotlinx.io.asSource
 import kotlinx.io.buffered
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import java.net.URI
-import java.nio.file.Paths
+import kotlinx.serialization.json.*
 import org.springframework.ai.chat.messages.AssistantMessage
 import org.springframework.ai.chat.messages.Message
 import org.springframework.ai.chat.messages.SystemMessage
@@ -69,11 +41,10 @@ import org.springframework.ai.openai.api.OpenAiApi
 import org.springframework.ai.tool.ToolCallback
 import org.springframework.ai.tool.definition.DefaultToolDefinition
 import org.springframework.ai.tool.resolution.StaticToolCallbackResolver
-import org.springframework.http.HttpHeaders
 import org.springframework.util.CollectionUtils
-import org.springframework.util.MultiValueMap
+import java.net.URI
 import java.nio.file.Files
-import java.nio.file.OpenOption
+import java.nio.file.Paths
 import java.nio.file.StandardOpenOption
 import kotlin.coroutines.CoroutineContext
 
@@ -102,7 +73,6 @@ internal class OpenAiAgentSupport(
     private val client: OpenAiClient
 ) : AgentSupport {
     override suspend fun initialize(clientInfo: com.agentclientprotocol.client.ClientInfo): AgentInfo {
-        logger.info { "Initializing ACP OpenAI agent (protocol ${clientInfo.protocolVersion})" }
         return AgentInfo(
             protocolVersion = LATEST_PROTOCOL_VERSION,
             capabilities = AgentCapabilities(
@@ -1045,7 +1015,9 @@ private data class McpResources(
     fun close() {
         clients.forEach { client ->
             runCatching { client.closeGracefully() }
-                .onFailure { logger.warn(it) { "Failed to close MCP client ${client.clientInfo.name()}" } }
+                .onFailure {
+//                    logger.warn(it) { "Failed to close MCP client ${client.clientInfo.name()}" }
+                }
         }
     }
 }
@@ -1062,7 +1034,7 @@ private fun buildMcpResources(servers: List<McpServer>): McpResources {
             is McpServer.Http -> buildHttpMcpClient(server, jsonMapper)
             is McpServer.Stdio -> buildStdioMcpClient(server, jsonMapper)
             is McpServer.Sse -> {
-                logger.warn { "Skipping unsupported MCP SSE server ${server.name}" }
+//                logger.warn { "Skipping unsupported MCP SSE server ${server.name}" }
                 null
             }
         }
@@ -1100,7 +1072,7 @@ private fun buildHttpMcpClient(
         client.initialize()
         client
     }.getOrElse { ex ->
-        logger.warn(ex) { "Failed to initialize MCP HTTP client ${server.name} (${server.url})" }
+//        logger.warn(ex) { "Failed to initialize MCP HTTP client ${server.name} (${server.url})" }
         null
     }
 }
@@ -1120,7 +1092,7 @@ private fun buildStdioMcpClient(
         client.initialize()
         client
     }.getOrElse { ex ->
-        logger.warn(ex) { "Failed to initialize MCP stdio client ${server.name}" }
+//        logger.warn(ex) { "Failed to initialize MCP stdio client ${server.name}" }
         null
     }
 }
@@ -1131,7 +1103,7 @@ private fun buildToolCallbacks(
     objectMapper: ObjectMapper
 ): List<ToolCallback> {
     val tools = runCatching { client.listTools().tools() }.getOrElse { ex ->
-        logger.warn(ex) { "Failed to list MCP tools for $serverName" }
+//        logger.warn(ex) { "Failed to list MCP tools for $serverName" }
         emptyList()
     }
     val namePrefix = sanitizeServerName(serverName)
@@ -1179,8 +1151,9 @@ private class McpToolCallback(
             val result = client.callTool(McpSchema.CallToolRequest(toolName, args))
             formatMcpToolResult(result, objectMapper)
         }.getOrElse { ex ->
-            logger.warn(ex) { "MCP tool $toolName failed" }
-            """{ "error": "true", "message": "${ex.message ?: "Tool call failed"}" }"""
+//            logger.warn(ex) { "MCP tool $toolName failed" }
+//            """{ "error": "true", "message": "${ex.message ?: "Tool call failed"}" }"""
+            ""
         }
     }
 }
