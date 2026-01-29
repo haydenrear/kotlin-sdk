@@ -178,13 +178,15 @@ class OpenAiAcpAgentOperationsTest {
         clientProtocol.start()
         agentProtocol.start()
 
-//        val server = McpServer.Http(
-//            name = "deepwiki",
-//            url = "https://mcp.deepwiki.com/mcp",
-//            headers = emptyList()
-//        )
+        val server = McpServer.Http(
+            name = "deepwiki",
+            url = "https://mcp.deepwiki.com/mcp",
+            headers = emptyList()
+        )
 
-        val servers = mutableListOf<McpServer>()
+        val servers = mutableListOf<McpServer>(
+            server
+        )
 
         val openAiClient = OpenAiClient(
             apiKey = "local",
